@@ -3,7 +3,7 @@ import users from "../Modals/Auth.js";
 import nodemailer from "nodemailer";
 
 // ===============================
-// REGION DETECTION (SAFE VERSION)
+// REGION DETECTION (SAFE)
 // ===============================
 const getRegionFromRequest = async (req) => {
   try {
@@ -18,7 +18,6 @@ const getRegionFromRequest = async (req) => {
 
     if (ip.startsWith("::ffff:")) ip = ip.split(":").pop();
 
-    // timeout-safe fetch (Render fix)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
 
@@ -29,7 +28,6 @@ const getRegionFromRequest = async (req) => {
     clearTimeout(timeout);
 
     const data = await res.json();
-
     return data?.region || null;
   } catch (error) {
     console.warn("Region lookup failed:", error.message);
@@ -38,12 +36,12 @@ const getRegionFromRequest = async (req) => {
 };
 
 // ===============================
-// OTP STORE (IN MEMORY)
+// OTP STORE
 // ===============================
 const otpStore = {};
 
 // ===============================
-// EMAIL SENDER (FIXED VERSION)
+// EMAIL SENDER SAFE
 // ===============================
 const sendOtpEmail = async (email, otp) => {
   const smtpUser = process.env.SMTP_USER;
@@ -51,9 +49,11 @@ const sendOtpEmail = async (email, otp) => {
   const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
   const smtpPort = Number(process.env.SMTP_PORT || 587);
 
-  // If SMTP missing → don't crash server
+  // ❗ If SMTP not configured, just log OTP
   if (!smtpUser || !smtpPass) {
-    console.log("⚠️ SMTP not configured. OTP:", otp, "Email:", email);
+    console.log("⚠️ SMTP NOT CONFIGURED");
+    console.log("EMAIL:", email);
+    console.log("OTP:", otp);
     return;
   }
 
@@ -90,12 +90,12 @@ const sendOtpEmail = async (email, otp) => {
 export const sendotp = async (req, res) => {
   const { email, mobile } = req.body;
 
-  let location = req.body.location;
-  if (!location) location = await getRegionFromRequest(req);
-
   if (!email && !mobile) {
     return res.status(400).json({ message: "Email or mobile required" });
   }
+
+  let location = req.body.location;
+  if (!location) location = await getRegionFromRequest(req);
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = Date.now() + 5 * 60 * 1000;
@@ -104,12 +104,18 @@ export const sendotp = async (req, res) => {
   otpStore[key] = { otp, expiresAt };
 
   try {
-    await sendOtpEmail(email, otp);
+    // ✅ FIX: email optional
+    if (email) {
+      await sendOtpEmail(email, otp);
+    } else {
+      console.log("OTP (mobile):", mobile, otp);
+    }
 
     return res.status(200).json({
       success: true,
-      method: "email",
-      devOtp: otp, // remove in production later
+      method: email ? "email" : "sms",
+      target: email || mobile,
+      otp, // ⚠️ frontend gets OTP directly (dev mode)
     });
   } catch (error) {
     console.error("Send OTP error:", error);
@@ -203,9 +209,7 @@ export const updateprofile = async (req, res) => {
   try {
     const updated = await users.findByIdAndUpdate(
       id,
-      {
-        $set: { channelname, description },
-      },
+      { $set: { channelname, description } },
       { new: true }
     );
 
