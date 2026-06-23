@@ -2,58 +2,58 @@ import mongoose from "mongoose";
 import users from "../Modals/Auth.js";
 import nodemailer from "nodemailer";
 
-
+// ===============================
+// REGION DETECTION (SAFE VERSION)
+// ===============================
 const getRegionFromRequest = async (req) => {
   try {
-    // Prefer explicit location in body if provided
-    if (req.body && req.body.location) return req.body.location;
+    if (req.body?.location) return req.body.location;
 
-    let ip = req.headers["x-forwarded-for"]?.split(",")[0] || req.ip || req.connection?.remoteAddress;
+    let ip =
+      req.headers["x-forwarded-for"]?.split(",")[0] ||
+      req.ip ||
+      req.connection?.remoteAddress;
+
     if (!ip) return null;
-    // Normalize IPv4 mapped addresses
+
     if (ip.startsWith("::ffff:")) ip = ip.split(":").pop();
 
-    // Use ipapi.co to lookup region for the remote IP
-    const res = await fetch(`https://ipapi.co/${ip}/json/`);
+    // timeout-safe fetch (Render fix)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+
+    const res = await fetch(`https://ipapi.co/${ip}/json/`, {
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
     const data = await res.json();
-    if (data && data.region) return data.region;
-    return null;
+
+    return data?.region || null;
   } catch (error) {
-    console.warn("Region lookup failed:", error?.message || error);
+    console.warn("Region lookup failed:", error.message);
     return null;
   }
 };
 
-// In-memory OTP storage
+// ===============================
+// OTP STORE (IN MEMORY)
+// ===============================
 const otpStore = {};
 
+// ===============================
+// EMAIL SENDER (FIXED VERSION)
+// ===============================
 const sendOtpEmail = async (email, otp) => {
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
   const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
-  const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
+  const smtpPort = Number(process.env.SMTP_PORT || 587);
 
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-      <h2 style="color: #d32f2f; text-align: center; border-bottom: 2px solid #d32f2f; padding-bottom: 10px;">YourTube Secure Verification</h2>
-      <p>Dear User,</p>
-      <p>Your one-time verification code (OTP) for logging into YourTube is:</p>
-      <div style="font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; letter-spacing: 4px; color: #d32f2f;">
-        ${otp}
-      </div>
-      <p>This code is valid for 5 minutes. Do not share this OTP with anyone.</p>
-      <p style="font-size: 12px; color: #888; text-align: center; border-top: 1px solid #ddd; padding-top: 10px; margin-top: 20px;">
-        YourTube Security Team.
-      </p>
-    </div>
-  `;
-
+  // If SMTP missing → don't crash server
   if (!smtpUser || !smtpPass) {
-    console.log("-----------------------------------------");
-    console.log("[OTP EMAIL SIMULATION] SMTP Credentials missing. OTP Details:");
-    console.log(`To: ${email}`);
-    console.log(`OTP: ${otp}`);
-    console.log("-----------------------------------------");
+    console.log("⚠️ SMTP not configured. OTP:", otp, "Email:", email);
     return;
   }
 
@@ -66,164 +66,152 @@ const sendOtpEmail = async (email, otp) => {
         user: smtpUser,
         pass: smtpPass,
       },
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
 
     await transporter.sendMail({
-      from: `"YourTube Security" <${smtpUser}>`,
+      from: `"YourTube" <${smtpUser}>`,
       to: email,
-      subject: `YourTube Login OTP: ${otp}`,
-      html: htmlContent,
+      subject: "YourTube OTP Verification",
+      html: `<h2>Your OTP is: ${otp}</h2>`,
     });
-    console.log(`OTP email sent successfully to ${email}`);
+
+    console.log("OTP sent to:", email);
   } catch (error) {
-    console.error("Failed to send OTP email:", error);
+    console.error("Email send failed:", error.message);
   }
 };
 
+// ===============================
+// SEND OTP
+// ===============================
 export const sendotp = async (req, res) => {
   const { email, mobile } = req.body;
+
   let location = req.body.location;
-  if (!location) {
-    location = await getRegionFromRequest(req);
-  }
+  if (!location) location = await getRegionFromRequest(req);
 
   if (!email && !mobile) {
-    return res.status(400).json({ message: "Email or mobile number is required" });
+    return res.status(400).json({ message: "Email or mobile required" });
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins expiration
+  const expiresAt = Date.now() + 5 * 60 * 1000;
 
-  const southIndianStates = ["tamil nadu", "kerala", "karnataka", "andhra pradesh", "telangana"];
-  const isSouthIndia = !!(location && southIndianStates.includes(location.toLowerCase().trim()));
+  const key = (email || mobile).toLowerCase().trim();
+  otpStore[key] = { otp, expiresAt };
 
   try {
-    if (isSouthIndia) {
-      if (!email) {
-        return res.status(400).json({ message: "Email is required for South India login verification" });
-      }
-      otpStore[email.toLowerCase().trim()] = { otp, expiresAt };
-      await sendOtpEmail(email, otp);
-      return res.status(200).json({
-        success: true,
-        method: "email",
-        target: email,
-        devOtp: !process.env.SMTP_USER ? otp : undefined,
-      });
-    } else {
-      if (!mobile) {
-        return res.status(400).json({ message: "Mobile number is required for verification" });
-      }
-      otpStore[mobile.trim()] = { otp, expiresAt };
-      console.log("-----------------------------------------");
-      console.log(`[OTP SMS SIMULATION] Sent OTP to Mobile: ${mobile}`);
-      console.log(`OTP: ${otp}`);
-      console.log("-----------------------------------------");
-      return res.status(200).json({
-        success: true,
-        method: "sms",
-        target: mobile,
-        devOtp: otp,
-      });
-    }
+    await sendOtpEmail(email, otp);
+
+    return res.status(200).json({
+      success: true,
+      method: "email",
+      devOtp: otp, // remove in production later
+    });
   } catch (error) {
     console.error("Send OTP error:", error);
-    return res.status(500).json({ message: "Failed to generate OTP" });
+    return res.status(500).json({ message: "OTP generation failed" });
   }
 };
 
+// ===============================
+// VERIFY OTP
+// ===============================
 export const verifyotp = async (req, res) => {
-  const { email, mobile, otp, location, name, image } = req.body;
+  const { email, mobile, otp } = req.body;
 
-  const southIndianStates = ["tamil nadu", "kerala", "karnataka", "andhra pradesh", "telangana"];
-  const isSouthIndia = location && southIndianStates.includes(location.toLowerCase());
-  const key = isSouthIndia ? (email ? email.toLowerCase() : "") : mobile;
+  const key = (email || mobile)?.toLowerCase().trim();
 
   if (!key) {
-    return res.status(400).json({ message: "Verification key is missing" });
+    return res.status(400).json({ message: "Missing email/mobile" });
   }
 
   const record = otpStore[key];
+
   if (!record) {
-    return res.status(400).json({ message: "No OTP sent for this contact info" });
+    return res.status(400).json({ message: "OTP not found" });
   }
 
   if (Date.now() > record.expiresAt) {
     delete otpStore[key];
-    return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+    return res.status(400).json({ message: "OTP expired" });
   }
 
   if (record.otp !== otp) {
-    return res.status(400).json({ message: "Invalid OTP. Please try again." });
+    return res.status(400).json({ message: "Invalid OTP" });
   }
 
-  // Clear OTP on success
   delete otpStore[key];
 
   try {
-    // Find or create user
-    const userEmail = email || `${mobile}@yourtube.com`; // fallback email for mobile-only login
+    const userEmail = email || `${mobile}@yourtube.com`;
+
     let user = await users.findOne({ email: userEmail });
 
     if (!user) {
-      user = await users.create({ 
-        email: userEmail, 
-        name: name || (mobile ? `User ${mobile.slice(-4)}` : "User"),
-        image: image || "https://github.com/shadcn.png",
+      user = await users.create({
+        email: userEmail,
+        name: mobile ? `User ${mobile.slice(-4)}` : "User",
+        image: "https://github.com/shadcn.png",
         mobile: mobile || "",
       });
+
       return res.status(201).json({ result: user });
-    } else {
-      if (mobile && !user.mobile) {
-        user.mobile = mobile;
-        await user.save();
-      }
-      return res.status(200).json({ result: user });
     }
+
+    return res.status(200).json({ result: user });
   } catch (error) {
     console.error("Verify OTP error:", error);
-    return res.status(500).json({ message: "Authentication failed during OTP verification" });
+    return res.status(500).json({ message: "Auth failed" });
   }
 };
 
+// ===============================
+// LOGIN
+// ===============================
 export const login = async (req, res) => {
   const { email, name, image } = req.body;
 
   try {
-    const existingUser = await users.findOne({ email });
+    let user = await users.findOne({ email });
 
-    if (!existingUser) {
-      const newUser = await users.create({ email, name, image });
-      return res.status(201).json({ result: newUser });
-    } else {
-      return res.status(200).json({ result: existingUser });
+    if (!user) {
+      user = await users.create({ email, name, image });
     }
+
+    return res.status(200).json({ result: user });
   } catch (error) {
-    console.error("Login error:", error);
-    return res.status(500).json({ message: "Something went wrong" });
+    console.error(error);
+    return res.status(500).json({ message: "Login failed" });
   }
 };
 
+// ===============================
+// UPDATE PROFILE
+// ===============================
 export const updateprofile = async (req, res) => {
-  const { id: _id } = req.params;
+  const { id } = req.params;
   const { channelname, description } = req.body;
-  if (!mongoose.Types.ObjectId.isValid(_id)) {
-    return res.status(500).json({ message: "User unavailable..." });
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid user" });
   }
+
   try {
-    const updatedata = await users.findByIdAndUpdate(
-      _id,
+    const updated = await users.findByIdAndUpdate(
+      id,
       {
-        $set: {
-          channelname: channelname,
-          description: description,
-        },
+        $set: { channelname, description },
       },
       { new: true }
     );
-    return res.status(201).json(updatedata);
+
+    return res.status(200).json(updated);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Something went wrong" });
+    return res.status(500).json({ message: "Update failed" });
   }
 };
