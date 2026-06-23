@@ -20,13 +20,13 @@ dotenv.config();
 const app = express();
 
 // =======================
-// CORS FIX (IMPORTANT)
+// FIXED CORS (PRODUCTION SAFE)
 // =======================
 app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://yourtube-mern.vercel.app"
+      "https://yourtube-mern-b6hj8h94a-sahi2.vercel.app"
     ],
     credentials: true,
   })
@@ -64,11 +64,14 @@ mongoose
 const server = http.createServer(app);
 
 // =======================
-// SOCKET FIX (IMPORTANT)
+// SOCKET FIX
 // =======================
 const io = new Server(server, {
   cors: {
-    origin: "https://yourtube-mern.vercel.app",
+    origin: [
+      "http://localhost:3000",
+      "https://yourtube-mern-b6hj8h94a-sahi2.vercel.app"
+    ],
     methods: ["GET", "POST"],
     credentials: true,
   },
