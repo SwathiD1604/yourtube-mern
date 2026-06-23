@@ -7,20 +7,26 @@ interface UserContextType {
   login: (userdata: any) => void;
   logout: () => Promise<void>;
   regionState: string;
-  setRegionState: React.Dispatch<React.SetStateAction<string>>;
+  setRegionState: (value: string | ((prev: string) => string)) => void;
   timeMode: string;
-  setTimeMode: React.Dispatch<React.SetStateAction<string>>;
+  setTimeMode: (value: string | ((prev: string) => string)) => void;
   isLightTheme: boolean;
 }
 
 const UserContext = createContext<UserContextType | null>(null);
 
-// Pure function: compute theme from region + current IST time
+// Theme logic
 const computeTheme = (region: string): boolean => {
-  const southIndianStates = ["tamil nadu", "kerala", "karnataka", "andhra pradesh", "telangana"];
+  const southIndianStates = [
+    "tamil nadu",
+    "kerala",
+    "karnataka",
+    "andhra pradesh",
+    "telangana",
+  ];
+
   const isSouthIndia = southIndianStates.includes(region.toLowerCase());
 
-  // Calculate current IST time (UTC + 5:30)
   const now = new Date();
   const utc = now.getTime() + now.getTimezoneOffset() * 60000;
   const istDate = new Date(utc + 3600000 * 5.5);
@@ -28,12 +34,11 @@ const computeTheme = (region: string): boolean => {
   const minutes = istDate.getMinutes();
   const minsSinceMidnight = hours * 60 + minutes;
 
-  // Light only: South India AND between 10:00 AM (600 mins) – 12:00 PM (720 mins) IST
   const isLightTime = minsSinceMidnight >= 600 && minsSinceMidnight <= 720;
+
   return isSouthIndia && isLightTime;
 };
 
-// Apply theme to <html> immediately
 const applyTheme = (shouldBeLight: boolean) => {
   if (shouldBeLight) {
     document.documentElement.classList.remove("dark");
@@ -44,34 +49,50 @@ const applyTheme = (shouldBeLight: boolean) => {
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
+
   const [regionState, _setRegionState] = useState<string>(
-    typeof window !== "undefined" ? localStorage.getItem("region") || "" : ""
+    typeof window !== "undefined"
+      ? localStorage.getItem("region") || ""
+      : ""
   );
-  // wrapper to persist selected region
-  const setRegionState = (val: string) => {
-    _setRegionState(val);
-    try {
+
+  const setRegionState = (
+    value: string | ((prev: string) => string)
+  ) => {
+    _setRegionState((prev) => {
+      const next =
+        typeof value === "function" ? value(prev) : value;
+
       if (typeof window !== "undefined") {
-        localStorage.setItem("region", val || "");
+        localStorage.setItem("region", next || "");
       }
-    } catch (e) {
-      /* ignore storage errors */
-    }
+
+      return next;
+    });
   };
-  const [isLightTheme, setIsLightTheme] = useState<boolean>(false);
+
   const [timeMode, _setTimeMode] = useState<string>(
-    typeof window !== "undefined" ? localStorage.getItem("timeMode") || "system" : "system"
+    typeof window !== "undefined"
+      ? localStorage.getItem("timeMode") || "system"
+      : "system"
   );
-  const setTimeMode = (val: string) => {
-    _setTimeMode(val);
-    try {
+
+  const setTimeMode = (
+    value: string | ((prev: string) => string)
+  ) => {
+    _setTimeMode((prev) => {
+      const next =
+        typeof value === "function" ? value(prev) : value;
+
       if (typeof window !== "undefined") {
-        localStorage.setItem("timeMode", val || "system");
+        localStorage.setItem("timeMode", next || "system");
       }
-    } catch (e) {
-      /* ignore */
-    }
+
+      return next;
+    });
   };
+
+  const [isLightTheme, setIsLightTheme] = useState<boolean>(false);
 
   const login = (userdata: any) => {
     setUser(userdata);
@@ -84,7 +105,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     toast.success("Signed out successfully");
   };
 
-  // Restore user from localStorage on mount
+  // restore user
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -96,38 +117,42 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Auto-detect user state/location via IP on mount
+  // detect location
   useEffect(() => {
     const detectLocation = async () => {
       try {
-        // If region already set in localStorage or by user, keep it
-        if (regionState && regionState.trim().length > 0) return;
-        const geoRes = await fetch("https://ipapi.co/json/");
-        const geoData = await geoRes.json();
-        if (geoData && geoData.region) {
-          setRegionState(geoData.region);
+        if (regionState) return;
+
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+
+        if (data?.region) {
+          setRegionState(data.region);
         }
-      } catch (error) {
-        console.log("Location auto-detection failed. Defaulting to dark theme.");
+      } catch (err) {
         setRegionState("");
       }
     };
+
     detectLocation();
   }, []);
 
-  // Theme application: re-evaluate every 30 seconds + on region change
+  // theme updater
   useEffect(() => {
     const updateTheme = () => {
-      // Respect forced timeMode
       let light = computeTheme(regionState);
+
       if (timeMode === "force-light") light = true;
-      else if (timeMode === "force-dark") light = false;
+      if (timeMode === "force-dark") light = false;
+
       setIsLightTheme(light);
       applyTheme(light);
     };
 
-    updateTheme(); // Apply immediately
-    const interval = setInterval(updateTheme, 30000); // Re-check every 30s
+    updateTheme();
+
+    const interval = setInterval(updateTheme, 30000);
+
     return () => clearInterval(interval);
   }, [regionState, timeMode]);
 
@@ -152,7 +177,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 export const useUser = () => {
   const context = useContext(UserContext);
   if (!context) {
-    throw new Error("useUser must be used within a UserProvider");
+    throw new Error("useUser must be used within UserProvider");
   }
   return context;
 };
