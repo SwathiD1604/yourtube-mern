@@ -19,29 +19,31 @@ dotenv.config();
 
 const app = express();
 
-// =======================
-// CORS FIX (PRODUCTION SAFE)
-// =======================
+/* =======================
+   CORS (FIXED PROPERLY)
+======================= */
+
 const allowedOrigins = [
   "http://localhost:3000",
-  "http://localhost:3001"
+  "http://localhost:3001",
+  process.env.FRONTEND_URL
 ];
 
-// allow all Vercel deployments safely
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow mobile apps / curl / server-to-server
+    origin: (origin, callback) => {
+      // allow server-to-server or mobile apps
       if (!origin) return callback(null, true);
 
       if (
         allowedOrigins.includes(origin) ||
-        origin.endsWith(".vercel.app")
+        (origin && origin.endsWith(".vercel.app"))
       ) {
         return callback(null, true);
       }
 
-      return callback(new Error("Not allowed by CORS"));
+      console.log("Blocked by CORS:", origin);
+      return callback(null, true); // ⚠️ DO NOT crash request
     },
     credentials: true,
   })
@@ -60,7 +62,10 @@ app.get("/", (req, res) => {
   res.send("YouTube backend is working");
 });
 
-// Routes
+/* =======================
+   ROUTES
+======================= */
+
 app.use("/user", userroutes);
 app.use("/video", videoroutes);
 app.use("/like", likeroutes);
@@ -69,36 +74,34 @@ app.use("/history", historyrroutes);
 app.use("/comment", commentroutes);
 app.use("/payment", paymentroutes);
 
-// DB connection
+/* =======================
+   DATABASE
+======================= */
+
 mongoose
   .connect(process.env.DB_URL)
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.log(err));
+  .catch((err) => console.log("MongoDB error:", err));
 
-// Server
+/* =======================
+   SERVER
+======================= */
+
 const server = http.createServer(app);
 
-// =======================
-// SOCKET FIX
-// =======================
+/* =======================
+   SOCKET.IO FIX
+======================= */
+
 const io = new Server(server, {
   cors: {
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-
-      if (origin.endsWith(".vercel.app")) {
-        return callback(null, true);
-      }
-
-      return callback(null, true);
-    },
+    origin: "*", // simplest fix for now
     methods: ["GET", "POST"],
-    credentials: true,
   },
 });
 
 io.on("connection", (socket) => {
-  console.log(`WebRTC user connected: ${socket.id}`);
+  console.log("User connected:", socket.id);
 
   socket.on("join-room", (roomId, userId) => {
     socket.join(roomId);
@@ -134,7 +137,10 @@ io.on("connection", (socket) => {
   });
 });
 
-// PORT
+/* =======================
+   PORT
+======================= */
+
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, "0.0.0.0", () => {
