@@ -1,4 +1,9 @@
-import React, { useState, createContext, useEffect, useContext } from "react";
+import React, {
+  useState,
+  createContext,
+  useEffect,
+  useContext,
+} from "react";
 import axiosInstance from "./axiosinstance";
 import { toast } from "sonner";
 
@@ -7,15 +12,17 @@ interface UserContextType {
   login: (userdata: any) => void;
   logout: () => Promise<void>;
   regionState: string;
-  setRegionState: (value: string | ((prev: string) => string)) => void;
+  setRegionState: React.Dispatch<React.SetStateAction<string>>;
   timeMode: string;
-  setTimeMode: (value: string | ((prev: string) => string)) => void;
+  setTimeMode: React.Dispatch<React.SetStateAction<string>>;
   isLightTheme: boolean;
 }
 
-const UserContext = createContext<UserContextType | null>(null);
+const UserContext = createContext<UserContextType>(
+  {} as UserContextType
+);
 
-// Theme logic
+// ---------------- Theme Logic ----------------
 const computeTheme = (region: string): boolean => {
   const southIndianStates = [
     "tamil nadu",
@@ -25,16 +32,20 @@ const computeTheme = (region: string): boolean => {
     "telangana",
   ];
 
-  const isSouthIndia = southIndianStates.includes(region.toLowerCase());
+  const isSouthIndia = southIndianStates.includes(
+    region.toLowerCase()
+  );
 
   const now = new Date();
   const utc = now.getTime() + now.getTimezoneOffset() * 60000;
   const istDate = new Date(utc + 3600000 * 5.5);
+
   const hours = istDate.getHours();
   const minutes = istDate.getMinutes();
   const minsSinceMidnight = hours * 60 + minutes;
 
-  const isLightTime = minsSinceMidnight >= 600 && minsSinceMidnight <= 720;
+  const isLightTime =
+    minsSinceMidnight >= 600 && minsSinceMidnight <= 720;
 
   return isSouthIndia && isLightTime;
 };
@@ -47,53 +58,30 @@ const applyTheme = (shouldBeLight: boolean) => {
   }
 };
 
-export const UserProvider = ({ children }: { children: React.ReactNode }) => {
+// ---------------- Provider ----------------
+export const UserProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const [user, setUser] = useState<any>(null);
 
-  const [regionState, _setRegionState] = useState<string>(
+  const [regionState, setRegionState] = useState<string>(
     typeof window !== "undefined"
       ? localStorage.getItem("region") || ""
       : ""
   );
 
-  const setRegionState = (
-    value: string | ((prev: string) => string)
-  ) => {
-    _setRegionState((prev) => {
-      const next =
-        typeof value === "function" ? value(prev) : value;
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem("region", next || "");
-      }
-
-      return next;
-    });
-  };
-
-  const [timeMode, _setTimeMode] = useState<string>(
+  const [timeMode, setTimeMode] = useState<string>(
     typeof window !== "undefined"
       ? localStorage.getItem("timeMode") || "system"
       : "system"
   );
 
-  const setTimeMode = (
-    value: string | ((prev: string) => string)
-  ) => {
-    _setTimeMode((prev) => {
-      const next =
-        typeof value === "function" ? value(prev) : value;
+  const [isLightTheme, setIsLightTheme] =
+    useState<boolean>(false);
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem("timeMode", next || "system");
-      }
-
-      return next;
-    });
-  };
-
-  const [isLightTheme, setIsLightTheme] = useState<boolean>(false);
-
+  // ---------------- Auth ----------------
   const login = (userdata: any) => {
     setUser(userdata);
     localStorage.setItem("user", JSON.stringify(userdata));
@@ -105,7 +93,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     toast.success("Signed out successfully");
   };
 
-  // restore user
+  // ---------------- Restore user ----------------
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -117,7 +105,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // detect location
+  // ---------------- Detect location ----------------
   useEffect(() => {
     const detectLocation = async () => {
       try {
@@ -137,7 +125,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     detectLocation();
   }, []);
 
-  // theme updater
+  // ---------------- Theme updater ----------------
   useEffect(() => {
     const updateTheme = () => {
       let light = computeTheme(regionState);
@@ -174,6 +162,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// ---------------- Hook ----------------
 export const useUser = () => {
   const context = useContext(UserContext);
   if (!context) {
