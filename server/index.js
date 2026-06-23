@@ -19,60 +19,38 @@ dotenv.config();
 
 const app = express();
 
-/* =======================
-   CORS (SAFE PRODUCTION FIX)
-======================= */
-
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  process.env.FRONTEND_URL,
-];
-
-// remove undefined values
-const filteredOrigins = allowedOrigins.filter(Boolean);
+/* =========================
+   CORS (SAFE FIX)
+========================= */
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow server-to-server or curl requests
-      if (!origin) return callback(null, true);
-
-      if (
-        filteredOrigins.includes(origin) ||
-        origin.endsWith(".vercel.app")
-      ) {
-        return callback(null, true);
-      }
-
-      console.log("❌ Blocked by CORS:", origin);
-      return callback(null, true); // don't crash frontend
-    },
+    origin: "*", // TEMP FIX (important for debugging)
     credentials: true,
   })
 );
 
-/* =======================
+/* =========================
    MIDDLEWARE
-======================= */
+========================= */
 
-app.use(express.json({ limit: "30mb" }));
-app.use(express.urlencoded({ extended: true, limit: "30mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(bodyParser.json());
 
 app.use("/uploads", express.static(path.join("uploads")));
 
-/* =======================
+/* =========================
    TEST ROUTE
-======================= */
+========================= */
 
 app.get("/", (req, res) => {
-  res.send("YouTube backend is working");
+  res.send("YouTube backend is working 🚀");
 });
 
-/* =======================
+/* =========================
    ROUTES
-======================= */
+========================= */
 
 app.use("/user", userroutes);
 app.use("/video", videoroutes);
@@ -82,27 +60,32 @@ app.use("/history", historyrroutes);
 app.use("/comment", commentroutes);
 app.use("/payment", paymentroutes);
 
-/* =======================
-   DATABASE CONNECTION
-======================= */
+/* =========================
+   DB CONNECTION (IMPORTANT FIX)
+========================= */
 
 mongoose
   .connect(process.env.DB_URL)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.log("MongoDB error:", err));
+  .then(() => console.log("MongoDB connected ✅"))
+  .catch((err) => {
+    console.log("MongoDB ERROR ❌", err.message);
+  });
 
-/* =======================
-   SERVER + SOCKET
-======================= */
+/* =========================
+   SERVER
+========================= */
 
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // simple + safe for now
-    methods: ["GET", "POST"],
+    origin: "*",
   },
 });
+
+/* =========================
+   SOCKET
+========================= */
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
@@ -117,36 +100,24 @@ io.on("connection", (socket) => {
   });
 
   socket.on("offer", (payload) => {
-    if (payload.targetSocketId) {
-      io.to(payload.targetSocketId).emit("offer", payload);
-    } else {
-      socket.to(payload.roomId).emit("offer", payload);
-    }
+    io.to(payload.targetSocketId || payload.roomId).emit("offer", payload);
   });
 
   socket.on("answer", (payload) => {
-    if (payload.targetSocketId) {
-      io.to(payload.targetSocketId).emit("answer", payload);
-    } else {
-      socket.to(payload.roomId).emit("answer", payload);
-    }
+    io.to(payload.targetSocketId || payload.roomId).emit("answer", payload);
   });
 
   socket.on("ice-candidate", (payload) => {
-    if (payload.targetSocketId) {
-      io.to(payload.targetSocketId).emit("ice-candidate", payload);
-    } else {
-      socket.to(payload.roomId).emit("ice-candidate", payload);
-    }
+    io.to(payload.targetSocketId || payload.roomId).emit("ice-candidate", payload);
   });
 });
 
-/* =======================
-   START SERVER
-======================= */
+/* =========================
+   PORT
+========================= */
 
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT} 🚀`);
 });
