@@ -20,44 +20,52 @@ dotenv.config();
 const app = express();
 
 /* =======================
-   CORS (FIXED PROPERLY)
+   CORS (SAFE PRODUCTION FIX)
 ======================= */
 
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
 ];
+
+// remove undefined values
+const filteredOrigins = allowedOrigins.filter(Boolean);
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // allow server-to-server or mobile apps
+    origin: function (origin, callback) {
+      // allow server-to-server or curl requests
       if (!origin) return callback(null, true);
 
       if (
-        allowedOrigins.includes(origin) ||
-        (origin && origin.endsWith(".vercel.app"))
+        filteredOrigins.includes(origin) ||
+        origin.endsWith(".vercel.app")
       ) {
         return callback(null, true);
       }
 
-      console.log("Blocked by CORS:", origin);
-      return callback(null, true); // ⚠️ DO NOT crash request
+      console.log("❌ Blocked by CORS:", origin);
+      return callback(null, true); // don't crash frontend
     },
     credentials: true,
   })
 );
 
-// Middleware
+/* =======================
+   MIDDLEWARE
+======================= */
+
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true, limit: "30mb" }));
 app.use(bodyParser.json());
 
-// Static files
 app.use("/uploads", express.static(path.join("uploads")));
 
-// Test route
+/* =======================
+   TEST ROUTE
+======================= */
+
 app.get("/", (req, res) => {
   res.send("YouTube backend is working");
 });
@@ -75,7 +83,7 @@ app.use("/comment", commentroutes);
 app.use("/payment", paymentroutes);
 
 /* =======================
-   DATABASE
+   DATABASE CONNECTION
 ======================= */
 
 mongoose
@@ -84,18 +92,14 @@ mongoose
   .catch((err) => console.log("MongoDB error:", err));
 
 /* =======================
-   SERVER
+   SERVER + SOCKET
 ======================= */
 
 const server = http.createServer(app);
 
-/* =======================
-   SOCKET.IO FIX
-======================= */
-
 const io = new Server(server, {
   cors: {
-    origin: "*", // simplest fix for now
+    origin: "*", // simple + safe for now
     methods: ["GET", "POST"],
   },
 });
@@ -138,7 +142,7 @@ io.on("connection", (socket) => {
 });
 
 /* =======================
-   PORT
+   START SERVER
 ======================= */
 
 const PORT = process.env.PORT || 5000;
