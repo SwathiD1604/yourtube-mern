@@ -82,8 +82,7 @@ server.listen(PORT, () => {
 });
 
 const DBURL = process.env.DB_URL;
-mongoose
-  .connect(DBURL)
+mongoose.connect(process.env.DB_URL)
   .then(() => {
     console.log("Mongodb connected");
   })
