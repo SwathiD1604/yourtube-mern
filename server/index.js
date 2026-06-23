@@ -20,14 +20,29 @@ dotenv.config();
 const app = express();
 
 // =======================
-// FIXED CORS (PRODUCTION SAFE)
+// CORS FIX (PRODUCTION SAFE)
 // =======================
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001"
+];
+
+// allow all Vercel deployments safely
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "https://yourtube-mern-b6hj8h94a-sahi2.vercel.app"
-    ],
+    origin: function (origin, callback) {
+      // allow mobile apps / curl / server-to-server
+      if (!origin) return callback(null, true);
+
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith(".vercel.app")
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
@@ -68,10 +83,15 @@ const server = http.createServer(app);
 // =======================
 const io = new Server(server, {
   cors: {
-    origin: [
-      "http://localhost:3000",
-      "https://yourtube-mern-b6hj8h94a-sahi2.vercel.app"
-    ],
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+
+      return callback(null, true);
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
