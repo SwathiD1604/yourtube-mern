@@ -74,6 +74,7 @@ export default function Upgrade() {
         description: `Upgrade to ${planName} Plan`,
         order_id: orderData.id,
         handler: async function (response: any) {
+          console.log("Payment success response:", response);
           try {
             // Step 3: Verify payment on backend
             const verifyRes = await axiosInstance.post("/payment/verify", {
@@ -84,6 +85,8 @@ export default function Upgrade() {
               planName,
               email: user.email,
             });
+
+            console.log("Verification response:", verifyRes.data);
 
             if (verifyRes.data.success) {
               toast.success(`🎉 Successfully upgraded to ${planName} plan!`);
