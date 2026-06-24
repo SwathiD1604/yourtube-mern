@@ -9,16 +9,20 @@ export const uploadvideo = async (req, res) => {
       .json({ message: "plz upload a mp4 video file only" });
   } else {
     try {
+      // Store relative path for frontend access
+      const relativePath = req.file.path.replace(/\\/g, '/').split('/uploads/')[1] || req.file.filename;
+      
       const file = new video({
         videotitle: req.body.videotitle,
         filename: req.file.originalname,
-        filepath: req.file.path,
+        filepath: `uploads/${relativePath}`,
         filetype: req.file.mimetype,
         filesize: req.file.size,
         videochanel: req.body.videochanel,
         uploader: req.body.uploader,
       });
       await file.save();
+      console.log("Video uploaded with filepath:", file.filepath);
       return res.status(201).json("file uploaded successfully");
     } catch (error) {
       console.error(" error:", error);
