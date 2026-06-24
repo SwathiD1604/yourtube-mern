@@ -14,6 +14,7 @@ import watchlaterroutes from "./routes/watchlater.js";
 import historyrroutes from "./routes/history.js";
 import commentroutes from "./routes/comment.js";
 import paymentroutes from "./routes/payment.js";
+import adminroutes from "./routes/admin.js";
 
 dotenv.config();
 
@@ -59,6 +60,7 @@ app.use("/watch", watchlaterroutes);
 app.use("/history", historyrroutes);
 app.use("/comment", commentroutes);
 app.use("/payment", paymentroutes);
+app.use("/admin", adminroutes);
 
 /* =========================
    DB CONNECTION (IMPORTANT FIX)
