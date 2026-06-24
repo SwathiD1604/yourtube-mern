@@ -96,8 +96,19 @@ export default function Upgrade() {
               toast.error("Payment verified but upgrade failed. Contact support.");
             }
           } catch (err: any) {
-            console.error("Verify error:", err?.response?.data || err);
-            toast.error(err?.response?.data?.message || "Payment verification failed");
+            console.error("Verify error:", err);
+            console.error("Error response:", err?.response);
+            console.error("Error data:", err?.response?.data);
+            console.error("Error message:", err?.message);
+            console.error("Error code:", err?.code);
+            
+            let errorMsg = "Payment verification failed";
+            if (err?.response?.data?.message) {
+              errorMsg = err.response.data.message;
+            } else if (err?.message) {
+              errorMsg = err.message;
+            }
+            toast.error(errorMsg);
           } finally {
             setLoadingPlan(null);
           }
