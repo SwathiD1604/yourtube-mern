@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import users from "../Modals/Auth.js";
 import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
 // ===============================
 // REGION DETECTION (SAFE)
@@ -44,6 +45,29 @@ const otpStore = {};
 // EMAIL SENDER SAFE
 // ===============================
 const sendOtpEmail = async (email, otp) => {
+  const sendGridApiKey = process.env.SENDGRID_API_KEY;
+
+  console.log("Email Configuration Check:");
+  console.log("- SendGrid API Key:", sendGridApiKey ? "✓ Configured" : "✗ Missing");
+
+  // Try SendGrid first (recommended for production)
+  if (sendGridApiKey) {
+    try {
+      sgMail.setApiKey(sendGridApiKey);
+      await sgMail.send({
+        to: email,
+        from: "yourtube@example.com",
+        subject: "YourTube OTP Verification",
+        html: `<h2>Your OTP is: ${otp}</h2><p>This code will expire in 5 minutes.</p>`,
+      });
+      console.log("✅ OTP sent via SendGrid to:", email);
+      return;
+    } catch (error) {
+      console.error("❌ SendGrid failed:", error.message);
+    }
+  }
+
+  // Fallback to SMTP
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
   const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
@@ -55,9 +79,8 @@ const sendOtpEmail = async (email, otp) => {
   console.log("- SMTP_HOST:", smtpHost);
   console.log("- SMTP_PORT:", smtpPort);
 
-  // ❗ If SMTP not configured, just log OTP
   if (!smtpUser || !smtpPass) {
-    console.log("⚠️ SMTP NOT CONFIGURED - OTP will be logged only");
+    console.log("⚠️ No email service configured - OTP will be logged only");
     console.log("EMAIL:", email);
     console.log("OTP:", otp);
     return;
@@ -84,11 +107,10 @@ const sendOtpEmail = async (email, otp) => {
       html: `<h2>Your OTP is: ${otp}</h2>`,
     });
 
-    console.log("✅ OTP sent successfully to:", email);
+    console.log("✅ OTP sent via SMTP to:", email);
   } catch (error) {
-    console.error("❌ Email send failed:", error.message);
+    console.error("❌ SMTP failed:", error.message);
     console.error("Full error:", error);
-    // Don't throw error - OTP will still work via response
   }
 };
 
