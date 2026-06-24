@@ -111,40 +111,39 @@ export const verifyPayment = async (req, res) => {
 // EMAIL FUNCTION
 const sendInvoiceEmail = async (userEmail, planName, paymentId) => {
   console.log("Attempting to send invoice email to:", userEmail);
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-
-  // Try SendGrid first
-  if (sendGridApiKey) {
-    try {
-      sgMail.setApiKey(sendGridApiKey);
-      await sgMail.send({
-        to: userEmail,
-        from: "yourtube@example.com",
-        subject: "YourTube Invoice - Plan Upgrade Successful",
-        html: `
-          <h2>🎉 Plan Upgrade Successful!</h2>
-          <p><strong>Plan:</strong> ${planName}</p>
-          <p><strong>Payment ID:</strong> ${paymentId}</p>
-          <p>Thank you for upgrading to YourTube Premium. Your new plan is now active.</p>
-          <p>Best regards,<br>YourTube Team</p>
-        `,
-      });
-      console.log("✅ Invoice email sent via SendGrid");
-      return;
-    } catch (error) {
-      console.error("❌ SendGrid failed:", error.message);
-    }
-  } else {
-    console.log("⚠️ SendGrid API key not configured");
-  }
-
-  // Fallback to SMTP
+  
+  // Use SMTP (Gmail) as primary since it's already configured
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
 
   if (!smtpUser || !smtpPass) {
-    console.log("⚠️ SMTP missing → skipping email");
-    return;
+    console.log("⚠️ SMTP missing, trying SendGrid as fallback");
+    const sendGridApiKey = process.env.SENDGRID_API_KEY;
+    
+    if (sendGridApiKey) {
+      try {
+        sgMail.setApiKey(sendGridApiKey);
+        await sgMail.send({
+          to: userEmail,
+          from: smtpUser || "yourtube@example.com", // Use SMTP user as sender if available
+          subject: "YourTube Invoice - Plan Upgrade Successful",
+          html: `
+            <h2>🎉 Plan Upgrade Successful!</h2>
+            <p><strong>Plan:</strong> ${planName}</p>
+            <p><strong>Payment ID:</strong> ${paymentId}</p>
+            <p>Thank you for upgrading to YourTube Premium. Your new plan is now active.</p>
+            <p>Best regards,<br>YourTube Team</p>
+          `,
+        });
+        console.log("✅ Invoice email sent via SendGrid");
+        return;
+      } catch (error) {
+        console.error("❌ SendGrid failed:", error.message);
+      }
+    } else {
+      console.log("⚠️ SendGrid API key also missing → skipping email");
+      return;
+    }
   }
 
   try {
@@ -161,8 +160,14 @@ const sendInvoiceEmail = async (userEmail, planName, paymentId) => {
     await transporter.sendMail({
       from: smtpUser,
       to: userEmail,
-      subject: "YourTube Invoice",
-      html: `<h2>Plan: ${planName}</h2><p>Payment ID: ${paymentId}</p>`,
+      subject: "YourTube Invoice - Plan Upgrade Successful",
+      html: `
+        <h2>🎉 Plan Upgrade Successful!</h2>
+        <p><strong>Plan:</strong> ${planName}</p>
+        <p><strong>Payment ID:</strong> ${paymentId}</p>
+        <p>Thank you for upgrading to YourTube Premium. Your new plan is now active.</p>
+        <p>Best regards,<br>YourTube Team</p>
+      `,
     });
 
     console.log("✅ Invoice email sent via SMTP");
