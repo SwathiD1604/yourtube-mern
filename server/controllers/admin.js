@@ -36,3 +36,24 @@ export const fixVideoPaths = async (req, res) => {
     return res.status(500).json({ message: "Error fixing video paths", error: error.message });
   }
 };
+
+// Show all video filepaths for debugging
+export const showVideoPaths = async (req, res) => {
+  try {
+    const videos = await video.find().select('videotitle filepath');
+    
+    const videoPaths = videos.map(v => ({
+      title: v.videotitle,
+      filepath: v.filepath
+    }));
+
+    return res.status(200).json({ 
+      success: true, 
+      count: videos.length,
+      videos: videoPaths 
+    });
+  } catch (error) {
+    console.error("Error showing video paths:", error);
+    return res.status(500).json({ message: "Error showing video paths", error: error.message });
+  }
+};
