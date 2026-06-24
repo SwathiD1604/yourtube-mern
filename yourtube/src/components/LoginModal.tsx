@@ -72,10 +72,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setStep(2);
         toast.success(`Verification OTP sent to your registered ${res.data.method}!`);
         
-        // Developer convenience check: if a mock/simulated OTP is returned, auto-inform the user
-        if (res.data.devOtp) {
-          console.log(`[TESTING OTP] ${res.data.devOtp}`);
-          toast.info(`[DEMO CODE] Your OTP is: ${res.data.devOtp} (printed to console too)`);
+        // Developer convenience check: if OTP is returned in response, display it
+        if (res.data.otp) {
+          console.log(`[TESTING OTP] ${res.data.otp}`);
+          toast.info(`[DEMO CODE] Your OTP is: ${res.data.otp} (printed to console too)`);
         }
       }
     } catch (error: any) {

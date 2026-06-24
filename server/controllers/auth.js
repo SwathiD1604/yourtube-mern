@@ -49,9 +49,15 @@ const sendOtpEmail = async (email, otp) => {
   const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
   const smtpPort = Number(process.env.SMTP_PORT || 587);
 
+  console.log("SMTP Configuration Check:");
+  console.log("- SMTP_USER:", smtpUser ? "✓ Configured" : "✗ Missing");
+  console.log("- SMTP_PASS:", smtpPass ? "✓ Configured" : "✗ Missing");
+  console.log("- SMTP_HOST:", smtpHost);
+  console.log("- SMTP_PORT:", smtpPort);
+
   // ❗ If SMTP not configured, just log OTP
   if (!smtpUser || !smtpPass) {
-    console.log("⚠️ SMTP NOT CONFIGURED");
+    console.log("⚠️ SMTP NOT CONFIGURED - OTP will be logged only");
     console.log("EMAIL:", email);
     console.log("OTP:", otp);
     return;
@@ -78,9 +84,11 @@ const sendOtpEmail = async (email, otp) => {
       html: `<h2>Your OTP is: ${otp}</h2>`,
     });
 
-    console.log("OTP sent to:", email);
+    console.log("✅ OTP sent successfully to:", email);
   } catch (error) {
-    console.error("Email send failed:", error.message);
+    console.error("❌ Email send failed:", error.message);
+    console.error("Full error:", error);
+    throw error;
   }
 };
 
