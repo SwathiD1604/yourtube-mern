@@ -87,7 +87,17 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       console.error("OTP send error:", error);
       console.error("Error response:", error.response?.data);
       console.error("Error message:", error.message);
-      const errMsg = error.response?.data?.message || "Failed to send verification code.";
+      console.error("Error code:", error.code);
+      
+      let errMsg = "Failed to send verification code.";
+      if (error.code === 'ECONNABORTED') {
+        errMsg = "Request timeout. Backend may be slow or unavailable.";
+      } else if (error.response?.data?.message) {
+        errMsg = error.response.data.message;
+      } else if (error.message) {
+        errMsg = error.message;
+      }
+      
       toast.error(errMsg);
     } finally {
       setSending(false);
