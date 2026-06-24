@@ -88,7 +88,7 @@ const sendOtpEmail = async (email, otp) => {
   } catch (error) {
     console.error("❌ Email send failed:", error.message);
     console.error("Full error:", error);
-    throw error;
+    // Don't throw error - OTP will still work via response
   }
 };
 
