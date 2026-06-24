@@ -234,7 +234,7 @@ export default function VideoPlayer({ video }: VideoPlayerProps) {
         onClick={(e) => e.preventDefault()} // Block standard click
       >
         <source
-          src={`${process.env.BACKEND_URL || "http://localhost:5000"}/${video?.filepath}`}
+          src={`${process.env.NEXT_PUBLIC_BACKEND_URL || "https://yourtube-backend-sc57.onrender.com"}/${video?.filepath}`}
           type="video/mp4"
         />
         Your browser does not support the video tag.

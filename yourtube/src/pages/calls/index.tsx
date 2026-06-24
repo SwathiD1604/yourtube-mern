@@ -49,7 +49,7 @@ export default function Calls() {
 
   // Establish socket connection for WebRTC signaling
   useEffect(() => {
-    const socketUrl = process.env.BACKEND_URL || "http://localhost:5000";
+    const socketUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://yourtube-backend-sc57.onrender.com";
     socketRef.current = io(socketUrl);
 
     socketRef.current.on("connect", () => {
