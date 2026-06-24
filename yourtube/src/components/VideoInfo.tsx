@@ -43,7 +43,7 @@ const VideoInfo = ({ video }: any) => {
       if (res.data.success) {
         toast.info("Starting file download. Please wait...");
         // Build correct backend URL – uses NEXT_PUBLIC_ prefix for client-side access
-        const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+        const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || "https://yourtube-backend-sc57.onrender.com").replace(/\/$/, "");
         // filepath may already start with uploads/ or similar
         const cleanPath = res.data.filepath.replace(/\\/g, "/");
         const fileUrl = `${backendBase}/${cleanPath}`;

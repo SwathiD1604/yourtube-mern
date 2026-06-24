@@ -1,6 +1,7 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 import users from "../Modals/Auth.js";
 
 // Razorpay instance
@@ -101,6 +102,32 @@ export const verifyPayment = async (req, res) => {
 
 // EMAIL FUNCTION
 const sendInvoiceEmail = async (userEmail, planName, paymentId) => {
+  const sendGridApiKey = process.env.SENDGRID_API_KEY;
+
+  // Try SendGrid first
+  if (sendGridApiKey) {
+    try {
+      sgMail.setApiKey(sendGridApiKey);
+      await sgMail.send({
+        to: userEmail,
+        from: "yourtube@example.com",
+        subject: "YourTube Invoice - Plan Upgrade Successful",
+        html: `
+          <h2>🎉 Plan Upgrade Successful!</h2>
+          <p><strong>Plan:</strong> ${planName}</p>
+          <p><strong>Payment ID:</strong> ${paymentId}</p>
+          <p>Thank you for upgrading to YourTube Premium. Your new plan is now active.</p>
+          <p>Best regards,<br>YourTube Team</p>
+        `,
+      });
+      console.log("✅ Invoice email sent via SendGrid");
+      return;
+    } catch (error) {
+      console.error("❌ SendGrid failed:", error.message);
+    }
+  }
+
+  // Fallback to SMTP
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
 
