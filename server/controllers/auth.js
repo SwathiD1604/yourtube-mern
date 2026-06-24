@@ -111,24 +111,20 @@ export const sendotp = async (req, res) => {
   const key = (email || mobile).toLowerCase().trim();
   otpStore[key] = { otp, expiresAt };
 
-  try {
-    // ✅ FIX: email optional
-    if (email) {
-      await sendOtpEmail(email, otp);
-    } else {
-      console.log("OTP (mobile):", mobile, otp);
-    }
-
-    return res.status(200).json({
-      success: true,
-      method: email ? "email" : "sms",
-      target: email || mobile,
-      otp, // ⚠️ frontend gets OTP directly (dev mode)
-    });
-  } catch (error) {
-    console.error("Send OTP error:", error);
-    return res.status(500).json({ message: "OTP generation failed" });
+  // Send email asynchronously (fire and forget) to avoid timeout
+  if (email) {
+    sendOtpEmail(email, otp).catch(err => console.error("Async email error:", err));
+  } else {
+    console.log("OTP (mobile):", mobile, otp);
   }
+
+  // Return immediately with OTP in response
+  return res.status(200).json({
+    success: true,
+    method: email ? "email" : "sms",
+    target: email || mobile,
+    otp, // OTP returned in response for development
+  });
 };
 
 // ===============================
