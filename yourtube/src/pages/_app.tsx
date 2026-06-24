@@ -6,26 +6,20 @@ import type { AppProps } from "next/app";
 import { UserProvider } from "../lib/AuthContext";
 import { useDynamicTheme } from "../lib/useDynamicTheme";
 
-function AppContent({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps }: AppProps) {
   useDynamicTheme();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <title>Your-Tube Clone</title>
-      <Header />
-      <Toaster />
-      <div className="flex">
-        <Sidebar />
-        <Component {...pageProps} />
-      </div>
-    </div>
-  );
-}
-
-export default function App({ Component, pageProps }: AppProps) {
-  return (
     <UserProvider>
-      <AppContent Component={Component} pageProps={pageProps} />
+      <div className="min-h-screen bg-background text-foreground">
+        <title>Your-Tube Clone</title>
+        <Header />
+        <Toaster />
+        <div className="flex">
+          <Sidebar />
+          <Component {...pageProps} />
+        </div>
+      </div>
     </UserProvider>
   );
 }
