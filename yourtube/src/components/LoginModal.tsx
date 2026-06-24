@@ -60,11 +60,16 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     setSending(true);
     try {
+      console.log("Sending OTP request to:", axiosInstance.defaults.baseURL + "/user/send-otp");
+      console.log("Request payload:", { email: email.trim(), mobile: mobile.trim(), location: regionState });
+      
       const res = await axiosInstance.post("/user/send-otp", {
         email: email.trim(),
         mobile: mobile.trim(),
         location: regionState,
       });
+
+      console.log("Response received:", res.data);
 
       if (res.data.success) {
         setOtpTarget(res.data.target);
@@ -79,7 +84,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         }
       }
     } catch (error: any) {
-      console.error(error);
+      console.error("OTP send error:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error message:", error.message);
       const errMsg = error.response?.data?.message || "Failed to send verification code.";
       toast.error(errMsg);
     } finally {
